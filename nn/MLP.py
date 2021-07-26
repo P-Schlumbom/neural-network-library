@@ -10,18 +10,29 @@ class Activation:
         pass
 
     def compute(self, x):
+        """
+        Default identity function
+        :param x: numpy array of a vector
+        :return:
+        """
         return x
 
     def compute_der(self, x):
         return np.ones(x.shape)
 
 class Sigmoid(Activation):
+    """
+    Implements the Sigmoid activation function and derivative version thereof.
+    """
     def compute(self, x):
         return 2 / (1 + np.exp(-x)) - 1
     def compute_der(self, x):
         return ((1 + x) * (1 - x)) / 2
 
 class ReLU(Activation):
+    """
+    Implements the ReLU activation function and the derivative thereof.
+    """
     def compute(self, x):
         x[x < 0] = 0
         return x
@@ -31,6 +42,9 @@ class ReLU(Activation):
         return 0
 
 class Softmax(Activation):
+    """
+    Implements the Softmax activation function (recommended for output layers only).
+    """
     def compute(self, x):
         denom = np.sum(np.exp(x), axis=0)
         return np.exp(x) / denom
@@ -71,7 +85,7 @@ class Regulariser:
 
 class L1_Regulariser(Regulariser):
     """
-    Lasso regularisation
+    Lasso regularisation; favours sparse weights
     """
     def __init__(self, lamb):
         """
@@ -85,7 +99,7 @@ class L1_Regulariser(Regulariser):
 
 class L2_Regulariser(Regulariser):
     """
-    Ridge Regularisation
+    Ridge Regularisation; favours minimised weights without extreme values (evenly distributed weights)
     """
     def __init__(self, lamb):
         self.lamb = lamb
@@ -96,7 +110,16 @@ class L2_Regulariser(Regulariser):
 #-----------------------------------------------------------------------------#
 
 class Layer:
+    """
+    Generic layer class for a single layer in a network model.
+    """
     def __init__(self, n_inputs, size, activation=Sigmoid):
+        """
+
+        :param n_inputs: int, the size of the input vector
+        :param size: int, the number of units in this layer ( = size of the output vector)
+        :param activation: Activation class object, the activation function to use
+        """
         self.W = np.random.normal(0, 1/np.sqrt(n_inputs), (size, n_inputs))
         self.b = np.ones((size, 1))
 
@@ -108,7 +131,15 @@ class Layer:
         self.activation = activation()
 
     def forward(self, X):
-        return X
+        """
+        Standard layer operation: multiply input vector with weight matrix, add bias, and compute activation.
+        :param X: numpy array of shape (n_inputs, N), where N is the number of samples
+        :return: numpy array of shape (size, N)
+        """
+        self.X = X
+        S = np.matmul(self.W, X) + self.b
+        self.A = self.activation.compute(S)
+        return self.A
 
     def backward(self, Y):
         return Y
@@ -123,19 +154,25 @@ class Layer:
         self.W_grad = self.deltaW + W_term
         self.b_grad = self.deltab + b_term
 
-    def update_params(self, eta=1, W_term=0, b_term=0):
+    def update_params(self, eta=0.1, W_term=0, b_term=0):
+        """
+        Update the W and b parameters based on the computed gradients
+        :param eta: float (typically in range 0 - 1); the learning rate used
+        :param W_term: optional float, a term added to the W gradient calculation. Used to add regularisation terms.
+        :param b_term: optional float, a term added to the b gradient calculation. Used to add regularisation terms.
+        :return:
+        """
         self.set_gradients(W_term, b_term)
         self.W -= eta * self.W_grad
         self.b -= eta * self.b_grad
 
 class Full(Layer):
-    def forward(self, X):
-        self.X = X
-        S = np.matmul(self.W, X) + self.b
-        self.A = self.activation.compute(S)
-        return self.A
-
     def backward(self, Y):
+        """
+        Pass errors backward and compute error gradients along the way
+        :param Y: numpy array of shape (size, N), typically the errors of the layer this layer outputs to
+        :return: numpy array of shape (n_inputs, N); the errors of this layer
+        """
         n = self.X.shape[1]  # number of samples in batch
         self.A = self.activation.compute_der(self.A)
         G = Y * self.A
@@ -145,7 +182,16 @@ class Full(Layer):
         return G
 
 class Output(Full):
+    """
+    The output layer for a neural network, which needs to treat some operations differently.
+    """
     def __init__(self, n_inputs, size, activation=Softmax):
+        """
+        Initialisation
+        :param n_inputs: int, the size of the input vector
+        :param size: int, the number of units in this layer ( = size of the output vector)
+        :param activation: Activation class object, the activation function to use
+        """
         self.W = np.random.normal(0, 1 / np.sqrt(n_inputs), (size, n_inputs))
         self.b = np.ones((size, 1))
 
@@ -155,11 +201,7 @@ class Output(Full):
         self.deltab = np.zeros((size, 1))
 
         self.activation = activation()
-    def forward(self, X):
-        self.X = X
-        S = np.matmul(self.W, X) + self.b
-        self.A = self.activation.compute(S)
-        return self.A
+
     def backward(self, Y):
         n = self.X.shape[1]  # number of samples in the batch
         G = -(Y - self.A)
@@ -169,7 +211,18 @@ class Output(Full):
         return G
 
 class MLP:
+    """
+    Currently, a pre-defined MLP with one hidden layer and an output layer. Demonstrates how to use the layer objects
+    to build an MLP of arbitrary dimensions.
+    """
     def __init__(self, n_inputs, layer_size, n_classes, lamb=None):
+        """
+        Initialise.
+        :param n_inputs: int, the size of the input vector
+        :param layer_size: int, the size of the hidden layer
+        :param n_classes: int, the number of output classes
+        :param lamb: optional float, the lambda parameter for regularisation
+        """
         self.full1 = Full(n_inputs, layer_size, activation=ReLU)
         self.out1 = Output(layer_size, n_classes)
 
@@ -179,19 +232,49 @@ class MLP:
             self.regularise = True
 
     def forward(self, X):
+        """
+        Pass a batch of data samples through the network
+        :param X: numpy array of shape (n_inputs, N), where N is the number of samples
+        :return: numpy array of shape (n_classes, N)
+        """
         return self.out1.forward(self.full1.forward(X))
 
-    def backward(self, Y, eta=1):
+    def backward(self, Y, eta=0.1):
+        """
+        Pass true labels backward through network, compute associated errors, and update weights accordingly
+        :param Y: numpy array of shape (n_classes, N) where N is the number of samples
+        :param eta: optional float, the learning rate
+        :return:
+        """
         self.full1.backward(self.out1.backward(Y))
         self.out1.update_params(eta)
         self.full1.update_params(eta)
 
-    def fit_step(self, X, Y, eta=1):
+    def fit_step(self, X, Y, eta=0.1):
+        """
+        One step of passing a set of samples through and updating the parameters based on the errors
+        :param X: numpy array of shape (n_inputs, N) where N is the number of samples
+        :param Y: numpy array of shape (n_classes, N)
+        :param eta: optional float, the learning rate
+        :return:
+        """
         self.forward(X)
         self.backward(Y, eta)
 
 class Trainer:
+    """
+    Given a model and training parameters, handle the training of the model on a given set of data X, Y
+    """
     def __init__(self, model, loss, eta=0.1, batch_size=10, epochs=1, steps=None):
+        """
+        Initialisation.
+        :param model: MLP object, the model to train
+        :param loss: Loss object, the loss function to use
+        :param eta: optional float, the learning rate
+        :param batch_size: optional int, the size of the batches to load from the data
+        :param epochs: optional int, the number of epochs to train for
+        :param steps: optional int, the number of steps to train for (note this will only be used if epochs is None)
+        """
         self.model = model
         self.loss = loss
         self.eta = eta
@@ -203,10 +286,13 @@ class Trainer:
 
     def train(self, X_train, Y_train, X_val=None, Y_val=None):
         """
-
-        :param X:
-        :param Y:
-        :return:
+        Train the provided model on the given training data, and optionally validate model performance during training
+        with validation data sets.
+        :param X: numpy array of shape (d, N) where d is the dimensionality of the input points and N is the number of
+        samples in the dataset
+        :param Y: numpy array of shape (K, N) where K is the number of prediction classes and N is the number of samples
+         in the dataset
+        :return: dict, a dictionary of lists recording the training and validation losses (and accuracies) per epoch
         """
         validate = X_val is not None  # only validate if validation set is provided
         N = X_train.shape[1]
