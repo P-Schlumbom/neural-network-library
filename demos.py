@@ -2,6 +2,7 @@
 A collection of functions demonstrating how every class can be used.
 """
 
+import sys
 import numpy as np
 from nn.SOM import SOM
 
@@ -49,5 +50,19 @@ def som_demo():
         print("{}: {}".format(loc, index2name[loc]))
 
 if __name__=="__main__":
-    som_demo()
+    argument_set = "  som : run self organising map demo\n" \
+                   "  -h, help : print help response\n"
+
+    arg_func = "som"
+    if len(sys.argv) > 1:
+        arg_func = sys.argv[1]
+
+    if arg_func == "som":
+        som_demo()
+
+    if arg_func == "-h" or arg_func == "help":
+        print("List of available commands:\n", argument_set)
+
+    if arg_func is None:
+        print("No target provided. Enter argument for desired demonstration function:\n", argument_set)
 
