@@ -2,3 +2,8 @@
 A library of neural network methods written both for personal development and convenience of access. The MLP 
 implementation in particular may be handy for small-scale applications that don't require the full weight of PyTorch or 
 Tensorflow. 
+
+## Types:
+### MultiLayer Perceptron (MLP):
+
+### Self Organising Map (SOM):

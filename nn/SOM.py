@@ -1,3 +1,8 @@
+"""
+Self Organising Map (SOM)
+
+"""
+
 import numpy as np
 
 VERBOSE = 1
